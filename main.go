@@ -29,11 +29,19 @@ type Response struct {
 }
 
 func sendResponse(w http.ResponseWriter, response Response) {
+	// allow CORS
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	if r.Method == http.MethodGet {
 		queryParams := r.URL.Query()
 		spreadSheetId := queryParams.Get("spreadsheet_id")
@@ -74,6 +82,7 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/sheet-data", helloHandler)
+
 	http.ListenAndServe(":8080", nil)
 	log.Println("Server started on port 8080")
 }
