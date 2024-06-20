@@ -52,7 +52,15 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		data := readGoogleSheet(spreadSheetId, sheetIdInt)
+		data, errorMessage := readGoogleSheet(spreadSheetId, sheetIdInt)
+		if errorMessage != nil {
+			sendResponse(w, Response{
+				Message: errorMessage.Error(),
+				Status:  "error",
+				Data:    data,
+			})
+			return
+		}
 		sendResponse(w, Response{
 			Message: "",
 			Status:  "success",
@@ -67,9 +75,10 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	http.HandleFunc("/sheet-data", helloHandler)
 	http.ListenAndServe(":8080", nil)
+	log.Println("Server started on port 8080")
 }
 
-func readGoogleSheet(spreadsheetID string, sheetId int) [][]interface{} {
+func readGoogleSheet(spreadsheetID string, sheetId int) ([][]interface{}, error) {
 	sheetService, err := NewSpreadsheetService("service-account.json")
 	if err != nil {
 		log.Printf("Unable to read service account key file  %v", err)
@@ -80,15 +89,13 @@ func readGoogleSheet(spreadsheetID string, sheetId int) [][]interface{} {
 	doc, err := sheetService.service.Spreadsheets.Get(spreadsheetID).Do()
 
 	if err != nil {
-		fmt.Println("Unable to retrieve spreadsheet.")
-		return [][]interface{}{}
+		return [][]interface{}{}, fmt.Errorf("unable to retrieve spreadsheet")
 	}
 
 	sheet := &sheets.Sheet{}
 	hasFound := false
 	for _, s := range doc.Sheets {
 		if s.Properties.SheetId == int64(sheetId) {
-			fmt.Println("Sheet found", s.Properties.Title)
 			sheet = s
 			hasFound = true
 			break
@@ -96,8 +103,7 @@ func readGoogleSheet(spreadsheetID string, sheetId int) [][]interface{} {
 	}
 
 	if !hasFound {
-		fmt.Println("Sheet not found")
-		return [][]interface{}{}
+		return [][]interface{}{}, fmt.Errorf("sheet not found")
 	}
 
 	sheetTitle := sheet.Properties.Title
@@ -105,17 +111,15 @@ func readGoogleSheet(spreadsheetID string, sheetId int) [][]interface{} {
 
 	resp, err := sheetService.service.Spreadsheets.Values.Get(spreadsheetID, readRange).Do()
 	if err != nil {
-		fmt.Println("Unable to retrieve data from sheet.")
-		return [][]interface{}{}
+		return [][]interface{}{}, fmt.Errorf("unable to retrieve data from sheet")
 	}
 
 	if len(resp.Values) == 0 {
-		fmt.Println("No data found.")
-		return [][]interface{}{}
+		return [][]interface{}{}, fmt.Errorf("no data found in sheet")
 	}
 
 	vals := resp.Values
-	return vals
+	return vals, nil
 }
 
 type SpreadsheetService struct {
