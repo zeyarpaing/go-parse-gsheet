@@ -87,8 +87,8 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	http.HandleFunc("/sheet-data", helloHandler)
 
-	http.ListenAndServe(":8080", nil)
-	log.Println("Server started on port 8080")
+	http.ListenAndServe(":3333", nil)
+	log.Println("Server started on port 3333")
 }
 
 func readGoogleSheet(spreadsheetID string, sheetId int, sheetName string) ([][]interface{}, error) {
