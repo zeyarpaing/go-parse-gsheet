@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
@@ -46,21 +47,24 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 		queryParams := r.URL.Query()
 		spreadSheetId := queryParams.Get("spreadsheet_id")
 		sheetId := queryParams.Get("sheet_id")
+		sheetName := queryParams.Get("sheet_name")
 
 		// parse string to int
 		sheetIdInt, err := strconv.Atoi(sheetId)
 
 		if err != nil {
 			log.Printf("Unable to convert sheet_id to int %v", err)
-			sendResponse(w, Response{
-				Message: "Invalid sheet_id",
-				Status:  "error",
-				Data:    nil,
-			})
-			return
+			if sheetName == "" {
+				sendResponse(w, Response{
+					Message: "Invalid sheet_id",
+					Status:  "error",
+					Data:    nil,
+				})
+				return
+			}
 		}
 
-		data, errorMessage := readGoogleSheet(spreadSheetId, sheetIdInt)
+		data, errorMessage := readGoogleSheet(spreadSheetId, sheetIdInt, strings.Trim(sheetName, ""))
 		if errorMessage != nil {
 			sendResponse(w, Response{
 				Message: errorMessage.Error(),
@@ -87,7 +91,7 @@ func main() {
 	log.Println("Server started on port 8080")
 }
 
-func readGoogleSheet(spreadsheetID string, sheetId int) ([][]interface{}, error) {
+func readGoogleSheet(spreadsheetID string, sheetId int, sheetName string) ([][]interface{}, error) {
 	sheetService, err := NewSpreadsheetService("service-account.json")
 	if err != nil {
 		log.Printf("Unable to read service account key file  %v", err)
@@ -103,11 +107,21 @@ func readGoogleSheet(spreadsheetID string, sheetId int) ([][]interface{}, error)
 
 	sheet := &sheets.Sheet{}
 	hasFound := false
-	for _, s := range doc.Sheets {
-		if s.Properties.SheetId == int64(sheetId) {
-			sheet = s
-			hasFound = true
-			break
+	if sheetName != "" {
+		for _, s := range doc.Sheets {
+			if s.Properties.Title == sheetName {
+				sheet = s
+				hasFound = true
+				break
+			}
+		}
+	} else {
+		for _, s := range doc.Sheets {
+			if s.Properties.SheetId == int64(sheetId) {
+				sheet = s
+				hasFound = true
+				break
+			}
 		}
 	}
 
